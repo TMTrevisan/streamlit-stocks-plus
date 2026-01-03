@@ -4,9 +4,9 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-# --- THE TAO ENGINE ---
-def calculate_tao_mechanics(df):
-    # 1. The EMA Stack (The Tao Core)
+# --- THE MPHINANCAL ENGINE ---
+def calculate_mphinancial_mechanics(df):
+    # 1. The EMA Stack (The mphinancial Core)
     for p in [8, 21, 34, 55, 89]:
         df[f'EMA{p}'] = df['Close'].ewm(span=p, adjust=False).mean()
     
@@ -37,7 +37,7 @@ def calculate_tao_mechanics(df):
     return df
 
 # --- UI SETUP ---
-st.set_page_config(page_title="Tao Terminal", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Mphinancial Terminal", layout="wide", initial_sidebar_state="expanded")
 
 # Custom CSS for that "Sober Terminal" Look
 st.markdown("""
@@ -47,7 +47,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.sidebar.title("🥷 Tao of Trading")
+st.sidebar.title("🥷 Phinances of Trading")
 # Removed default stock for a clean start
 ticker = st.sidebar.text_input("Enter Ticker:").upper()
 
@@ -60,7 +60,7 @@ if ticker:
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = data.columns.get_level_values(0)
 
-        data = calculate_tao_mechanics(data)
+        data = calculate_mphinancial_mechanics(data)
         
         # Pull latest scalars correctly using .item() or float() to avoid Series ambiguity
         last_row = data.iloc[-1]
@@ -140,7 +140,7 @@ if ticker:
             if price > sma200 and is_stacked and adx_val >= 20 and in_buy_zone:
                 st.balloons()
                 st.markdown("### 🏆 HIGH QUALITY SETUP")
-                st.write("All Tao mechanics are aligned for an entry.")
+                st.write("All Phinancial mechanics are aligned for an entry.")
             else:
                 st.markdown("### 🔍 MONITORING MODE")
                 st.write("Wait for all mechanical criteria to align.")
