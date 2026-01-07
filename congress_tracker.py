@@ -59,7 +59,8 @@ def fetch_congress_members(api_key=None):
             return pd.DataFrame()
             
     except Exception as e:
-        st.error(f"Connection Error: {str(e)}")
+        st.error(f"Congress API Connection Failed")
+        st.exception(e)
         return pd.DataFrame()
 
 

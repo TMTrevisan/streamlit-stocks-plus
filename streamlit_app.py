@@ -1173,7 +1173,7 @@ with tab4:
     with st.spinner("Connecting to Congress.gov..."):
         members = fetch_congress_members(api_key=api_key)
         if members.empty:
-            st.error("❌ Invalid API Key or Connection Failed. Please check your settings.")
+            st.stop()
         else:
             st.caption(f"✅ Connected: Tracking {len(members)} active members")
     
