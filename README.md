@@ -1,41 +1,75 @@
-The Mphinancial Terminal is a specialized trading tool built with Streamlit to perform a "Tao Audit" on stock tickers. It uses a specific set of mechanical criteria to identify high quality trend-following setups.
+# Mphinancial Stock Analysis Terminal
 
-![Mphinancial Terminal Interface](Screenshot%202026-01-02%208.30.26%20PM.png)
-The visual interface showing a High Quality Setup audit for GOOGL.
+A comprehensive quantitative research platform built with Streamlit, integrating technical analysis, sector rotation models, options flow intelligence, and alternative data.
 
-## ⚙️ The Mphinancial Engine
-The application performs several quantitative calculations to evaluate the current state of a stock:
+## 🚀 Key Features
 
-- The EMA Stack: Calculates five Exponential Moving Averages (8, 21, 34, 55, and 89) to determine trend alignment.
-- The Wind (200 SMA): Uses the 200-period Simple Moving Average as the primary trend filter.
-- ADX (Trend Strength): A custom manual calculation of the Average Directional Index to ensure compatibility across various systems, including Chromebooks.
-- ATR (Volatility): Measures the Average True Range to define the current "Buy Zone" relative to price action.
+The terminal is organized into five specialized modules:
 
-##  🔍 Mechanical Audit Criteria
-The terminal evaluates every ticker against four primary mechanical checks to provide a final verdict:
+### 1. 📊 Market Health (Asbury 6)
+A quantitative daily gauge of US equity market internal strength.
+- **Six Metrics**: Breadth, Volume, Relative Performance, Asset Flows, VIX, Price Momentum.
+- **Signals**: BUY (Green), NEUTRAL (Yellow), CASH (Red).
+- **History**: Interactive charts tracking signal evolution against SPX performance.
 
-- Trend Filter: The current price must be above the 200 SMA (Sailing with the Wind).
-- Bullish Stack: All five EMAs must be in perfect numerical alignment (8 > 21 > 34 > 55 > 89) to confirm momentum.
-- The Buy Zone: The current price must be within 1 ATR of the 21 EMA to avoid overextension.
-- ADX Strength: The ADX value must be at or above 20 to signify a trending market rather than a ranging one.
+### 2. 📈 Sector Rotation (SEAF Model)
+The **Sector ETF Asset Flows (SEAF)** model ranks all 11 Select Sector SPDR ETFs.
+- **Methodology**: Ranks sectors by "Money Flow" (Volume-Weighted Momentum + Relative Strength) across 4 timeframes (20d, 60d, 120d, 252d).
+- **Actionable**: Highlights the **Top 3 Sectors** for immediate allocation.
+- **Visualization**: Correlation heatmaps and score rankings.
 
-When all these criteria align, the terminal signals a High Quality Setup.
+### 3. 🌐 Intermarket Analysis
+Macro-level context for equity decisions.
+- **Yield Curve**: Visualizes 10Y-3M spread to detect recession warnings (Contango vs Backwardation).
+- **Commodities & Forex**: Dashboard for Oil, Gold, Bitcoin, and DXY.
+- **Asset Performance**: Normalized comparison of major asset classes over the last year.
 
-## 🛠️ Installation and Setup
+### 4. 📉 Stock Analysis (The Core IO)
+A deep-dive scanner for individual tickers.
+- **Mphinancial Verdict**: Technical audit (EMAs, SMA200, ADX, ATR Key Levels) to identify "High Quality Setups".
+- **Fundamental Health**: ROIC-style dashboard (ROIC, FCF, Margins, Valuation) powered by yfinance.
+- **Gamma & Volume Profile**: Analysis of options dealer positioning (GEX) and support/resistance levels.
+- **Options Flow**: Net premium tracking, unusual activity scanner, and Put/Call ratios.
 
-**Dependencies**
+### 5. 🏛️ Congressional Trading
+Track the "Smart Money" in Washington using the STOCK Act disclosures.
+- **Recent Trades**: Sortable table of latest filings by House/Senate members.
+- **Leaderboard**: Top traded tickers and most active politicians.
+- **Watchlist Check**: Automatically flags if your watchlist stocks are being bought/sold by Congress.
 
-The project relies on the following Python libraries:
-- Streamlit: For the web interface and dashboard.
-- Yfinance: To fetch historical market data.
-- Pandas and Numpy: For data manipulation and mathematical calculations.
- -Plotly: For interactive financial charting and candlestick visualization.
+---
 
-**Running the App**
+## 🛠️ Installation & Setup
 
-1. Ensure you have Python installed on your system.
-2. Install the required packages: pip install -r requirements.txt.
-3. Launch the terminal: ```streamlit run streamlit_app.py```
-4. Enter Ticker
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/ttrevisan-ilmn/streamlit-stocks-plus.git
+   cd streamlit-stocks-plus
+   ```
 
-Enter a ticker symbol in the sidebar to begin an audit.
+2. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Configure Secrets (Crucial!)**
+   To use the Congressional Trading feature, you must configure your API key.
+   
+   Create a file at `.streamlit/secrets.toml`:
+   ```toml
+   # .streamlit/secrets.toml
+   congress_api_key = "YOUR_CONGRESS_GOV_API_KEY"
+   ```
+   *(Note: You can get a free key at [api.congress.gov](https://api.congress.gov))*
+
+4. **Run the Application**
+   ```bash
+   streamlit run streamlit_app.py
+   ```
+
+## 🔒 Privacy & Data
+- **Local Persistence**: User watchlists and total API usage stats are stored locally in `api_stats.json`.
+- **No External Tracking**: All data fetching happens directly from your machine to the data providers (Yahoo Finance, Congress.gov).
+
+## ⚠️ Disclaimer
+This tool is for educational and research purposes only. It is not financial advice. 
