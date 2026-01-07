@@ -1012,12 +1012,13 @@ with tab6:
             
             with col_gamma:
                 st.subheader("Gamma Exposure by Strike")
+                gex = gamma_data['gex']
                 fig_gamma = go.Figure()
                 fig_gamma.add_trace(go.Bar(
-                    x=gamma_data['df']['strike'],
-                    y=gamma_data['df']['total_gamma'] / 1e6,
+                    x=gex.index,
+                    y=gex.values / 1e6,
                     name='Total Gamma',
-                    marker_color=['#4ade80' if x > 0 else '#ef4444' for x in gamma_data['df']['total_gamma']]
+                    marker_color=['#4ade80' if val > 0 else '#ef4444' for val in gex.values]
                 ))
                 fig_gamma.update_layout(template="plotly_dark", height=400)
                 # Update axis titles
@@ -1032,19 +1033,22 @@ with tab6:
             
             with col_vol:
                 st.subheader("Volume Profile")
+                vol = gamma_data['volume']
                 fig_vol = go.Figure()
-                fig_vol.add_trace(go.Bar(
-                    x=gamma_data['df']['strike'],
-                    y=gamma_data['df']['call_volume'],
-                    name='Call Vol',
-                    marker_color='#4ade80'
-                ))
-                fig_vol.add_trace(go.Bar(
-                    x=gamma_data['df']['strike'],
-                    y=gamma_data['df']['put_volume'],
-                    name='Put Vol',
-                    marker_color='#ef4444'
-                ))
+                if 'call' in vol.columns:
+                    fig_vol.add_trace(go.Bar(
+                        x=vol.index,
+                        y=vol['call'],
+                        name='Call Vol',
+                        marker_color='#4ade80'
+                    ))
+                if 'put' in vol.columns:
+                    fig_vol.add_trace(go.Bar(
+                        x=vol.index,
+                        y=vol['put'],
+                        name='Put Vol',
+                        marker_color='#ef4444'
+                    ))
                 fig_vol.update_layout(template="plotly_dark", height=400, barmode='stack')
                 fig_vol.update_yaxes(title_text="Volume", row=1, col=1)
                 fig_vol.update_xaxes(title_text="Strike Price ($)", row=1, col=1)
