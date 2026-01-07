@@ -9,7 +9,7 @@ from seaf_model import get_seaf_model, get_top_3_sectors
 from gamma_profile import get_gamma_profile
 from options_flow import get_daily_flow_snapshot, analyze_flow_sentiment
 from fundamental_metrics import fetch_fundamental_data, format_large_number
-from congress_tracker import fetch_stock_disclosures, get_top_traded_tickers, get_active_traders, check_watchlist_overlap
+from congress_tracker import fetch_congress_members, fetch_stock_disclosures, get_top_traded_tickers, get_active_traders, check_watchlist_overlap
 from macro_analysis import fetch_macro_data, get_yield_curve_data, get_asset_performance, render_yield_curve_chart, render_intermarket_chart
 from datetime import datetime
 
@@ -148,6 +148,20 @@ if st.sidebar.button("Reset Session"):
     st.rerun()
 
 st.sidebar.caption("Rate limit: ~2,000/hour")
+
+# --- SETTINGS ---
+st.sidebar.divider()
+with st.sidebar.expander("⚙️ Settings"):
+    st.caption("Configure API keys for external data sources.")
+    user_congress_key = st.text_input("Congress.gov API Key", type="password", key="user_congress_key_input")
+    if user_congress_key:
+        st.session_state['user_congress_key'] = user_congress_key
+        st.success("Key saved!")
+    elif 'congress_api_key' in st.secrets:
+        st.info("Using key from secrets.toml")
+    else:
+        st.warning("No API key found.")
+        st.markdown("[Get a free key](https://api.congress.gov/sign-up/)")
 
 # --- MAIN TABS ---
 tab1, tab2, tab5, tab3, tab4 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades"])
@@ -1250,11 +1264,27 @@ with tab3:
 
 # --- TAB 4: CONGRESSIONAL TRADING ---
 with tab4:
-    st.title("Congressional Stock Trading")
+    st.title("🏛️ Congressional Trading Tracker")
+    
+    # API Verification
+    api_key = st.session_state.get('user_congress_key') or st.secrets.get("congress_api_key")
+    
+    if not api_key:
+        st.warning("⚠️ **API Config Required:** Please enter your [Congress.gov API Key](https://api.congress.gov/sign-up/) in the sidebar settings ⚙️ to enable this tab.")
+        st.stop()
+        
     st.markdown("""
     Track stock trades disclosed by members of Congress under the STOCK Act.
     Congress members must disclose trades within 45 days of execution.
     """)
+    
+    # Verify connectivity (Visual indicator)
+    with st.spinner("Connecting to Congress.gov..."):
+        members = fetch_congress_members(api_key=api_key)
+        if members.empty:
+            st.error("❌ Invalid API Key or Connection Failed. Please check your settings.")
+        else:
+            st.caption(f"✅ Connected: Tracking {len(members)} active members")
     
     with st.spinner("🏛️ Loading Congressional trades..."):
         track_api_call()  # Track Congress API call

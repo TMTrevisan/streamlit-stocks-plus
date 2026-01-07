@@ -13,13 +13,14 @@ BASE_URL = "https://api.congress.gov/v3"
 
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
-def fetch_congress_members():
+def fetch_congress_members(api_key=None):
     """Fetch current Congress members."""
-    # Retrieve API key from secrets
-    api_key = st.secrets.get("congress_api_key")
+    # Prioritize passed key, then secrets
+    if not api_key:
+        api_key = st.secrets.get("congress_api_key")
+        
     if not api_key:
         # Graceful fallback or warning if key is missing
-        print("Warning: congress_api_key not found in .streamlit/secrets.toml")
         return pd.DataFrame()
 
     try:
