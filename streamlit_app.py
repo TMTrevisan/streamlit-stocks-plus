@@ -12,6 +12,20 @@ from fundamental_metrics import fetch_fundamental_data, format_large_number
 from congress_tracker import fetch_congress_members, fetch_stock_disclosures, get_top_traded_tickers, get_active_traders, check_watchlist_overlap
 from macro_analysis import fetch_macro_data, get_yield_curve_data, get_asset_performance, render_yield_curve_chart, render_intermarket_chart
 from datetime import datetime
+import streamlit.components.v1 as components
+
+def get_tv_symbol(ticker):
+    """Simple mapping for TradingView symbols."""
+    ticker = ticker.upper()
+    # Manual Mapping for common ETFs/Indices
+    if ticker in ['SPY', 'IWM', 'QQQ', 'DIA', 'GLD', 'SLV', 'TLT']:
+        return f"AMEX:{ticker}"
+    if ticker in ['VIX']:
+        return "CBOE:VIX"
+    if ticker in ['BTC-USD']:
+        return "COINBASE:BTCUSD"
+    # Default assumption for stocks (imperfect but fast)
+    return f"NASDAQ:{ticker}"
 
 # --- API CALL COUNTER WITH PERSISTENCE ---
 import json
@@ -163,11 +177,114 @@ with st.sidebar.expander("⚙️ Settings"):
         st.warning("No API key found.")
         st.markdown("[Get a free key](https://api.congress.gov/sign-up/)")
 
+# --- HEADER: TRADINGVIEW TICKER TAPE ---
+components.html("""
+<div class="tradingview-widget-container">
+  <div class="tradingview-widget-container__widget"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+  {
+  "symbols": [
+    {
+      "proName": "FOREXCOM:SPXUSD",
+      "title": "S&P 500"
+    },
+    {
+      "proName": "FOREXCOM:NSXUSD",
+      "title": "Nasdaq 100"
+    },
+    {
+      "proName": "FOREXCOM:DJI",
+      "title": "Dow 30"
+    },
+    {
+      "proName": "FX:EURUSD",
+      "title": "EUR/USD"
+    },
+    {
+      "proName": "BITSTAMP:BTCUSD",
+      "title": "Bitcoin"
+    },
+    {
+      "proName": "CMCMARKETS:GOLD",
+      "title": "Gold"
+    }
+  ],
+  "showSymbolLogo": true,
+  "colorTheme": "dark",
+  "isTransparent": false,
+  "displayMode": "adaptive",
+  "locale": "en"
+}
+  </script>
+</div>
+""", height=50)
+
 # --- MAIN TABS ---
-tab1, tab2, tab5, tab3, tab6, tab4 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🌪️ Options Flow", "🏛️ Congress Trades"])
+tab1, tab2, tab5, tab3, tab4, tab6 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades", "🌪️ Options Flow"])
 
 # --- TAB 1: MARKET HEALTH DASHBOARD ---
 with tab1:
+    st.subheader("Market Overview")
+    components.html("""
+<div class="tradingview-widget-container">
+  <div class="tradingview-widget-container__widget"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+  {
+  "symbols": [
+    [
+      "Apple",
+      "NASDAQ:AAPL|1D"
+    ],
+    [
+      "Google",
+      "NASDAQ:GOOGL|1D"
+    ],
+    [
+      "Microsoft",
+      "NASDAQ:MSFT|1D"
+    ],
+    [
+      "S&P 500",
+      "FOREXCOM:SPXUSD|1D"
+    ]
+  ],
+  "chartOnly": false,
+  "width": "100%",
+  "height": "100%",
+  "locale": "en",
+  "colorTheme": "dark",
+  "autosize": true,
+  "showVolume": false,
+  "showMA": false,
+  "hideDateRanges": false,
+  "hideMarketStatus": false,
+  "hideSymbolLogo": false,
+  "scalePosition": "right",
+  "scaleMode": "Normal",
+  "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
+  "fontSize": "10",
+  "noTimeScale": false,
+  "valuesTracking": "1",
+  "changeMode": "price-and-percent",
+  "chartType": "area",
+  "maLineColor": "#2962FF",
+  "maLineWidth": 1,
+  "maLength": 9,
+  "lineWidth": 2,
+  "lineType": 0,
+  "dateRanges": [
+    "1d|1",
+    "1m|30",
+    "3m|60",
+    "12m|1D",
+    "60m|1W",
+    "all|1M"
+  ]
+}
+  </script>
+</div>
+    """, height=500)
+    
     st.title("📊 Market Health Gauge (A6)")
     st.markdown("""
     The Asbury 6 is a quantitative, daily gauge of US equity market internal strength based on six key metrics.
@@ -895,6 +1012,26 @@ with tab3:
                     metric_box("Total Cash", format_large_number(fund_data['total_cash']), "Balance Sheet")
                 with v_col4:
                     metric_box("Total Debt", format_large_number(fund_data['total_debt']), "Balance Sheet")
+                
+                st.divider()
+                st.subheader("📚 Advanced Financials (TradingView)")
+                tv_symbol = get_tv_symbol(ticker)
+                components.html(f"""
+<div class="tradingview-widget-container">
+  <div class="tradingview-widget-container__widget"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js" async>
+  {{
+  "symbol": "{tv_symbol}",
+  "colorTheme": "dark",
+  "isTransparent": false,
+  "displayMode": "regular",
+  "width": "100%",
+  "height": "100%",
+  "locale": "en"
+}}
+  </script>
+</div>
+                """, height=500)
                     
             else:
                 st.warning("Could not fetch fundamental data.")
