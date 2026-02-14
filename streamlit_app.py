@@ -7,7 +7,7 @@ from plotly.subplots import make_subplots
 from asbury_metrics import get_asbury_6_signals, get_asbury_6_historical
 from seaf_model import get_seaf_model, get_top_3_sectors
 from gamma_profile import get_gamma_profile
-from options_flow import get_daily_flow_snapshot, analyze_flow_sentiment
+from options_flow import get_daily_flow_snapshot, analyze_flow_sentiment, get_volatility_analysis
 from fundamental_metrics import fetch_fundamental_data, format_large_number
 from congress_tracker import fetch_congress_members, fetch_stock_disclosures, get_top_traded_tickers, get_active_traders, check_watchlist_overlap
 from macro_analysis import fetch_macro_data, get_yield_curve_data, get_asset_performance, render_yield_curve_chart, render_intermarket_chart
@@ -169,6 +169,9 @@ def get_ticker_options():
     except:
         return etfs # Fallback if csv missing
 
+# --- TICKER SELECTION ---
+custom_input = st.sidebar.text_input("Quick Ticker Search:", help="Type any symbol (e.g. EOSE, TSLL) to override list selection.").upper().strip()
+
 ticker_options = get_ticker_options()
 # Smart Default: Initialize Session State to SPY if not set
 if "ticker_selector" not in st.session_state:
@@ -181,14 +184,14 @@ if "ticker_selector" not in st.session_state:
         st.session_state.ticker_selector = ticker_options[default_idx]
 
 selected_option = st.sidebar.selectbox(
-    "Select Ticker:", 
-    options=ticker_options + ["Other..."], 
+    "Or Browse S&P 500:", 
+    options=ticker_options, 
     key="ticker_selector",
-    help="Type to search supported S&P 500 stocks and ETFs."
+    help="Select from supported S&P 500 stocks and ETFs."
 )
 
-if selected_option == "Other...":
-    ticker = st.sidebar.text_input("Enter Custom Ticker:", value="NVDA").upper()
+if custom_input:
+    ticker = custom_input
 else:
     ticker = selected_option.split(" - ")[0]
 
@@ -546,8 +549,8 @@ with tab2:
         
         for col, (_, row) in zip([chart_col1, chart_col2, chart_col3], top_3.iterrows()):
             with col:
-                ticker = row['Ticker']
-                sector_data = fetch_sector_data(ticker, start_str, end_str)
+                sector_ticker = row['Ticker']
+                sector_data = fetch_sector_data(sector_ticker, start_str, end_str)
                 
                 if not sector_data.empty:
                     # Calculate return
@@ -572,7 +575,7 @@ with tab2:
                         height=200,
                         margin=dict(l=0, r=0, t=30, b=0),
                         title=dict(
-                            text=f"{ticker}: {pct_return:+.1f}%",
+                            text=f"{sector_ticker}: {pct_return:+.1f}%",
                             font=dict(size=14, color='#4ade80' if pct_return > 0 else '#ef4444')
                         ),
                         xaxis=dict(showticklabels=False, showgrid=False),
@@ -582,7 +585,7 @@ with tab2:
                     
                     st.plotly_chart(fig_mini, width="stretch")
                 else:
-                    st.caption(f"{ticker}: No data")
+                    st.caption(f"{sector_ticker}: No data")
         
         st.caption("90-day price performance")
         st.divider()
@@ -723,10 +726,10 @@ with tab2:
             start_str = (datetime.now() - pd.Timedelta(days=90)).strftime('%Y-%m-%d')
             
             sector_closes = {}
-            for ticker in SECTOR_ETFS.keys():
-                data = fetch_sector_data(ticker, start_str, end_str)
+            for sector_ticker_key in SECTOR_ETFS.keys():
+                data = fetch_sector_data(sector_ticker_key, start_str, end_str)
                 if not data.empty:
-                    sector_closes[ticker] = data['Close'].iloc[-60:]
+                    sector_closes[sector_ticker_key] = data['Close'].iloc[-60:]
             
             if sector_closes:
                 close_df = pd.DataFrame(sector_closes)
@@ -845,6 +848,27 @@ with tab5:
     st.markdown("---")
 
 
+@st.cache_data(ttl=300) # Cache for 5 minutes
+def fetch_stock_history(symbol):
+    try:
+        # Use Ticker object for better reliability than download()
+        stock = yf.Ticker(symbol)
+        df = stock.history(period="2y", interval="1d")
+        return df
+    except Exception as e:
+        print(f"Error fetching {symbol}: {e}")
+        return pd.DataFrame()
+
+# --- TAB 3: STOCK TICKER ANALYSIS ---
+@st.cache_data(ttl=3600) # Cache for 1 hour
+def fetch_stock_info(symbol):
+    try:
+        stock = yf.Ticker(symbol)
+        return stock.info
+    except Exception as e:
+        print(f"Error fetching info for {symbol}: {e}")
+        return {}
+
 # --- TAB 3: STOCK TICKER ANALYSIS ---
 with tab3:
     st.title("📉 Stock Analysis (Mphinancial Engine)")
@@ -852,9 +876,11 @@ with tab3:
     if ticker:
         # Use 2y to ensure 200 SMA has enough data to stabilize
         track_api_call()  # Track stock data fetch
-        data = yf.download(ticker, period="2y", interval="1d")
+        data = fetch_stock_history(ticker)
+        info = fetch_stock_info(ticker)
         
         if not data.empty and len(data) > 200:
+
             # Flatten MultiIndex columns if present (common with newer yfinance)
             if isinstance(data.columns, pd.MultiIndex):
                 data.columns = data.columns.get_level_values(0)
@@ -897,6 +923,35 @@ with tab3:
 
             st.divider()
 
+            if info:
+                # --- FUNDAMENTALS ROW ---
+                st.markdown("### Fundamentals")
+                f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+                
+                mkt_cap = info.get('marketCap', 0)
+                pe_ratio = info.get('trailingPE', 0)
+                div_yield = info.get('dividendYield', 0) * 100 if info.get('dividendYield') else 0
+                sector = info.get('sector', 'N/A')
+                industry = info.get('industry', 'N/A')
+                
+                def format_large_number(num):
+                    if num >= 1e12: return f"${num/1e12:.2f}T"
+                    if num >= 1e9: return f"${num/1e9:.2f}B"
+                    if num >= 1e6: return f"${num/1e6:.2f}M"
+                    return f"${num:,.0f}"
+
+                f_col1.metric("Market Cap", format_large_number(mkt_cap))
+                f_col2.metric("P/E Ratio", f"{pe_ratio:.2f}" if pe_ratio else "N/A")
+                f_col3.metric("Div Yield", f"{div_yield:.2f}%")
+                f_col4.metric("Sector", sector)
+                
+                with st.expander(f"🏢 Company Profile: {info.get('longName', ticker)}"):
+                    st.write(f"**Industry:** {industry}")
+                    st.write(f"**Website:** {info.get('website', 'N/A')}")
+                    st.write(info.get('longBusinessSummary', 'No description available.'))
+            
+            st.divider()
+
             # --- MAIN CONTENT ---
             chart_col, audit_col = st.columns([2, 1])
 
@@ -917,7 +972,9 @@ with tab3:
                                          name='SMA 200 (The Wind)', line=dict(color='white', width=3, dash='dash')))
                 
                 fig.update_layout(template="plotly_dark", height=600, margin=dict(l=0, r=0, t=0, b=0))
-                st.plotly_chart(fig, width="stretch")
+                # Explicit key to force re-render when ticker changes
+                st.caption(f"Displaying data for: **{ticker}**")
+                st.plotly_chart(fig, width="stretch", key=f"main_chart_{ticker}")
 
             with audit_col:
                 st.subheader("⚙️ Mechanics Check")
@@ -1031,7 +1088,7 @@ with tab3:
 }}
   </script>
 </div>
-                    """, height=500, key=f"tv_fin_{ticker}")
+                    """, height=1000)
                 else:
                     st.info(f"Financials widget is typically available for Equities. Current asset type: {q_type or 'Unknown'}")
                     
@@ -1199,6 +1256,43 @@ with tab6:
         # --- OPTIONS FLOW ANALYSIS ---
         st.divider()
         st.subheader(f"🌊 Options Flow Analysis: {ticker}")
+        
+        # --- VOLATILITY ANALYSIS ---
+        if 'data' not in locals() or data.empty:
+            data = fetch_stock_history(ticker)
+            
+        vol_metrics = get_volatility_analysis(ticker, data)
+        
+        if vol_metrics and 'hv_20' in vol_metrics:
+            st.markdown("### 🛡️ Options Strategy Intelligence")
+            
+            v_col1, v_col2, v_col3, v_col4 = st.columns(4)
+            
+            iv = vol_metrics.get('iv_current')
+            hv20 = vol_metrics.get('hv_20')
+            hv252 = vol_metrics.get('hv_252')
+            
+            v_col1.metric("Implied Volatility (IV)", f"{iv:.1f}%" if iv else "N/A", 
+                         help="Current IV derived from option chain." if iv else "No options data")
+            v_col2.metric("Hist. Volatility (20D)", f"{hv20:.1f}%", help="Realized volatility over past 20 days.")
+            v_col3.metric("Hist. Volatility (1Y)", f"{hv252:.1f}%", help="Realized volatility over past year.")
+            
+            rank_text = "N/A"
+            if iv and hv252:
+                 diff = iv - hv252
+                 rank_text = "High Prem" if diff > 0 else "Low Prem"
+                 
+            v_col4.metric("IV vs HV", rank_text, delta=f"{iv-hv252:.1f}%" if iv and hv252 else None)
+            
+            # Earnings & Dividends
+            with st.expander("📅 Event Risk & Income"):
+                e_col1, e_col2 = st.columns(2)
+                e_col1.write(f"**Earnings:** {vol_metrics.get('earnings_date', 'N/A')}")
+                e_col2.write(f"**Ex-Dividend:** {vol_metrics.get('ex_div_date', 'N/A')} ({vol_metrics.get('div_rate', 0)}/yr)")
+                
+                st.info("💡 **Strategy Tip**: Selling Puts is favorable when IV > HV and price is near technical support (e.g. Asbury 6 Positive). Selling Calls is risky near Earnings.")
+
+        st.divider()
         
         with st.spinner("Fetching daily flow data..."):
             flow_data = get_daily_flow_snapshot(ticker)

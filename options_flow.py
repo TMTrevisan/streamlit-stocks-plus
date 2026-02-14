@@ -203,6 +203,61 @@ def analyze_flow_sentiment(flow_data):
     }
 
 
+
+def get_volatility_analysis(ticker, price_data):
+    """
+    Calculate Historical Volatility and fetch implied metrics.
+    HV = std(ln(close/close.shift(1))) * sqrt(252)
+    """
+    try:
+        if price_data.empty:
+            return {}
+            
+        # Calculate Log Returns
+        # Create a copy to avoid SettingWithCopy warnings
+        df = price_data.copy()
+        if 'Close' not in df.columns:
+            return {}
+            
+        df['Log_Ret'] = np.log(df['Close'] / df['Close'].shift(1))
+        
+        # Calculate HV for different windows
+        hv_20 = df['Log_Ret'].rolling(window=20).std().iloc[-1] * np.sqrt(252) * 100
+        hv_50 = df['Log_Ret'].rolling(window=50).std().iloc[-1] * np.sqrt(252) * 100
+        hv_252 = df['Log_Ret'].rolling(window=252).std().iloc[-1] * np.sqrt(252) * 100
+        
+        # Initial estimate for IV (using yfinance info)
+        try:
+            info = yf.Ticker(ticker).info
+            iv_current = info.get('impliedVolatility') # Might be None
+            
+            # Helper for earnings
+            earnings = info.get('earningsTimestamp')
+            earnings_date = datetime.fromtimestamp(earnings).strftime('%Y-%m-%d') if earnings else "N/A"
+            
+            div_rate = info.get('dividendRate', 0)
+            ex_div = info.get('exDividendDate')
+            ex_div_date = datetime.fromtimestamp(ex_div).strftime('%Y-%m-%d') if ex_div else "N/A"
+        except:
+            iv_current = None
+            earnings_date = "N/A"
+            ex_div_date = "N/A"
+            div_rate = 0
+        
+        return {
+            'hv_20': hv_20,
+            'hv_50': hv_50,
+            'hv_252': hv_252,
+            'iv_current': iv_current * 100 if iv_current else None, # Convert to %
+            'earnings_date': earnings_date,
+            'ex_div_date': ex_div_date,
+            'div_rate': div_rate
+        }
+    except Exception as e:
+        print(f"Vol Error: {e}")
+        return {}
+
+
 if __name__ == '__main__':
     # Test the module
     print("\nOptions Flow Analysis Test")
