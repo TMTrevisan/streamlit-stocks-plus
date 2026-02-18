@@ -11,6 +11,10 @@ from options_flow import get_daily_flow_snapshot, analyze_flow_sentiment, get_vo
 from fundamental_metrics import fetch_fundamental_data, format_large_number
 from congress_tracker import fetch_congress_members, fetch_stock_disclosures, get_top_traded_tickers, get_active_traders, check_watchlist_overlap
 from macro_analysis import fetch_macro_data, get_yield_curve_data, get_asset_performance, render_yield_curve_chart, render_intermarket_chart
+from screener_engine import get_screener_universe, fetch_screener_data, apply_strategy
+from power_gauge import calculate_power_gauge
+from weinstein import get_weinstein_stage
+from canslim import get_canslim_metrics
 from datetime import datetime
 import streamlit.components.v1 as components
 
@@ -124,7 +128,9 @@ st.set_page_config(page_title="Mphinancial Terminal", layout="wide", initial_sid
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
-    .stMetric { background-color: #1f2937; padding: 15px; border-radius: 10px; }
+    .stMetric { background-color: #1f2937; padding: 15px; border-radius: 10px; color: white !important; }
+    .stMetric label { color: #9ca3af !important; }
+    .stMetric div[data-testid="stMetricValue"] { color: white !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -198,6 +204,61 @@ else:
 # Sanitize for yfinance (BRK.B -> BRK-B)
 ticker = ticker.replace('.', '-')
 
+# --- ANALYSIS STATE MANAGEMENT ---
+def initialize_analysis_state():
+    if 'analysis_data' not in st.session_state:
+        st.session_state.analysis_data = {
+            'ticker': None,
+            'power_gauge': None,
+            'weinstein': None,
+            'canslim': None,
+            'timestamp': None
+        }
+
+def run_analysis_pipeline(ticker_symbol):
+    """Orchestrates fetching data for all strategy modules."""
+    initialize_analysis_state()
+    
+    # Check if we already have valid data for this ticker
+    current_data = st.session_state.analysis_data
+    if current_data['ticker'] == ticker_symbol and current_data['power_gauge'] is not None:
+        return
+
+    # Create a status container
+    # Provide a spinner since st.status is new in Streamlit 1.25.0, assuming support but fallback to plain spinner if needed.
+    # We'll use st.status as it's cleaner.
+    try:
+        with st.status(f"Running Multi-Strategy Analysis for {ticker_symbol}...", expanded=True) as status:
+            # 1. Power Gauge
+            status.write("⚡ Computing Power Gauge (20-Factor Model)...")
+            pg_data = calculate_power_gauge(ticker_symbol)
+            
+            # 2. Weinstein Stage
+            status.write("📉 Identifying Weinstein Stage...")
+            w_data = get_weinstein_stage(ticker_symbol)
+            
+            # 3. CANSLIM
+            status.write("🚀 Checking CANSLIM Factors...")
+            c_data = get_canslim_metrics(ticker_symbol)
+            
+            # Update State
+            st.session_state.analysis_data = {
+                'ticker': ticker_symbol,
+                'power_gauge': pg_data,
+                'weinstein': w_data,
+                'canslim': c_data,
+                'timestamp': datetime.now()
+            }
+            
+            status.update(label="Analysis Complete!", state="complete", expanded=False)
+            
+    except Exception as e:
+        st.error(f"Error running analysis pipeline: {e}")
+
+# Run Pipeline on Ticker Change
+if ticker:
+    run_analysis_pipeline(ticker)
+
 # --- WATCHLIST ---
 if 'watchlist' not in st.session_state:
     st.session_state.watchlist = []
@@ -265,7 +326,7 @@ with st.sidebar.expander("⚙️ Settings"):
 # --- HEADER: TICKER TAPE REMOVED (Replaced by Grid in Tab 1) ---
 
 # --- MAIN TABS ---
-tab1, tab2, tab5, tab3, tab4, tab6 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades", "🌪️ Options Flow"])
+tab1, tab2, tab5, tab3, tab4, tab6, tab7, tab8, tab9, tab10 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades", "🌪️ Options Flow", "🔍 Stock Screener", "⚡ Power Gauge", "📉 Stage Analysis", "🚀 CANSLIM"])
 
 # --- TAB 1: MARKET HEALTH DASHBOARD ---
 with tab1:
@@ -873,6 +934,42 @@ def fetch_stock_info(symbol):
 with tab3:
     st.title("📉 Stock Analysis (Mphinancial Engine)")
     
+    # --- CONSOLIDATED STRATEGY DASHBOARD ---
+    # Retrieve Data
+    ad = st.session_state.get('analysis_data', {})
+    
+    if ticker and ad.get('ticker') == ticker:
+        st.markdown("### 🧭 Strategy Dashboard")
+        adb1, adb2, adb3 = st.columns(3)
+        
+        with adb1:
+            if ad.get('power_gauge'):
+                pg = ad['power_gauge']
+                st.metric("⚡ Power Gauge", pg['rating'], delta=f"{pg['score']:.1f}/100")
+            else:
+                st.metric("⚡ Power Gauge", "N/A")
+                
+        with adb2:
+            if ad.get('weinstein'):
+                ws = ad['weinstein']
+                # Parse short stage name
+                try:
+                    stage_name = ws['stage'].split(' (')[0]
+                except:
+                    stage_name = ws['stage']
+                st.metric("📉 Weinstein Stage", stage_name, delta=f"Slope: {ws['slope']:.2%}")
+            else:
+                 st.metric("📉 Weinstein Stage", "N/A")
+    
+        with adb3:
+            if ad.get('canslim'):
+                cs = ad['canslim']
+                st.metric("🚀 CANSLIM Score", f"{cs['score']}/7", delta="Growth")
+            else:
+                st.metric("🚀 CANSLIM Score", "N/A")
+        
+        st.divider()
+
     if ticker:
         # Use 2y to ensure 200 SMA has enough data to stabilize
         track_api_call()  # Track stock data fetch
@@ -1088,7 +1185,7 @@ with tab3:
 }}
   </script>
 </div>
-                    """, height=1000)
+                    """, height=1400)
                 else:
                     st.info(f"Financials widget is typically available for Equities. Current asset type: {q_type or 'Unknown'}")
                     
@@ -1554,3 +1651,218 @@ with tab4:
         This information is for educational purposes only and should not be considered investment advice.
         Past Congressional trades do not guarantee future performance.
         """)
+
+# --- TAB 7: STOCK SCREENER ---
+with tab7:
+    st.header("🔍 Intelligent Stock Screener")
+    st.caption("Screening the S&P 500 universe using real-time data.")
+    
+    col_s1, col_s2, col_s3 = st.columns([1, 1, 2])
+    
+    with col_s1:
+        strategy = st.selectbox("Select Strategy Preset", [
+            "Cash Secured Puts (CSP)",
+            "Covered Calls (CC)",
+            "Short Momentum",
+            "Mid Momentum",
+            "Safe Long"
+        ])
+    
+    if st.button("Run Screener", key="run_screener"):
+        with st.spinner(f"Scanning S&P 500 for {strategy} candidates... (This may take 10-15s)"):
+            # 1. Get Universe
+            tickers = get_screener_universe()
+            
+            # 2. Fetch Data (Cached)
+            data = fetch_screener_data(tickers)
+            
+            # 3. Apply Logic
+            results = apply_strategy(data, strategy)
+            
+            if not results.empty:
+                st.success(f"Found {len(results)} candidates for {strategy}.")
+                
+                # Interactive Table
+                st.dataframe(
+                    results.style.format({
+                        'Price': '${:.2f}',
+                        'MarketCap': '${:,.0f}',
+                        'PE': '{:.1f}',
+                        'DivYield': '{:.2%}',
+                        'RSI': '{:.1f}',
+                        'SMA50': '${:.2f}',
+                        'HV_20': '{:.1f}%'
+                    }), 
+                    use_container_width=True,
+                    height=500
+                )
+                
+                st.info("💡 **Tip**: Type a ticker from the list into the sidebar search to analyze it further.")
+                
+            else:
+                st.warning("No candidates found matching criteria.")
+
+# --- TAB 8: POWER GAUGE ---
+with tab8:
+    st.header(f"⚡ Power Gauge Rating: {ticker}")
+    st.caption("A 20-Factor Model analyzing Financials, Earnings, Technicals, and Experts.")
+    
+    with st.expander("Methodology: Power Gauge Analysis"):
+        st.markdown("""
+        **20-Factor Weighted Model:**
+        - **Financials**: Debt/Equity, ROE, Price/Book, FCF Yield.
+        - **Earnings**: 5yr Growth, Estimates, EPS Surprises, Trend.
+        - **Technicals**: Relative Strength, Price Trend, Moving Averages.
+        - **Experts**: Insider Transactions, Short Interest, Analyst Ratings.
+        """)
+    
+    # Check Session State First
+    ad = st.session_state.get('analysis_data', {})
+    gauge = None
+    
+    if ad.get('ticker') == ticker and ad.get('power_gauge'):
+        gauge = ad['power_gauge']
+    
+    # Fallback Button (or "Run Analysis" if not triggered automatically)
+    if not gauge:
+        if st.button("Generate Power Report", key="run_power_gauge"):
+            with st.spinner(f"Analyzing {ticker} across 20 data points..."):
+                gauge = calculate_power_gauge(ticker)
+    
+    if gauge:
+        # Top Level Result
+        col_g1, col_g2 = st.columns([1, 2])
+        
+        with col_g1:
+            st.metric("Power Rating", gauge['rating'], delta=f"{gauge['score']:.1f}/100")
+            
+            # Simple Gauge Visual (Progress Bar)
+            st.progress(int(gauge['score']))
+            if gauge['rating'] == "BULLISH":
+                st.success("Strong Buy Signal")
+            elif gauge['rating'] == "BEARISH":
+                st.error("Avoid / Sell Signal")
+            else:
+                st.warning("Neutral / Hold")
+                
+        with col_g2:
+            # Radar Chart or Bar Chart of Categories
+            cat_df = pd.DataFrame.from_dict(gauge['categories'], orient='index', columns=['Score'])
+            st.bar_chart(cat_df)
+        
+        st.divider()
+        
+        # Detailed Breakdown (4 Quadrants)
+        c1, c2 = st.columns(2)
+        c3, c4 = st.columns(2)
+        
+        def render_category(col, title, data):
+            with col:
+                st.subheader(title)
+                for factor, score in data.items():
+                    st.write(f"**{factor}**")
+                    st.progress(int(score))
+        
+        render_category(c1, "💰 Financials", gauge['details']['Financials'])
+        render_category(c2, "📈 Earnings", gauge['details']['Earnings'])
+        render_category(c3, "🛠️ Technicals", gauge['details']['Technicals'])
+        render_category(c4, "🧠 Experts", gauge['details']['Experts'])
+    elif not gauge and ticker:
+        st.info("Select a ticker to generate the specific report.")
+
+# --- TAB 9: WEINSTEIN STAGE ANALYSIS ---
+with tab9:
+    st.header(f"📉 Weinstein Stage Analysis: {ticker}")
+    st.caption("Weekly Chart Analysis using 30-Week SMA and Relative Strength.")
+    
+    with st.expander("Methodology: Weinstein Stage Analysis"):
+        st.markdown("""
+        **Stan Weinstein's 4 Stages:**
+        1.  **Stage 1 (Basing)**: Price oscillates sideways. Moving Average (MA) flattens. Avoid.
+        2.  **Stage 2 (Advancing)**: Breakout on high volume. Price > Rising 30-week MA. **Buy Zone.**
+        3.  **Stage 3 (Topping)**: Momentum slows. Price chops around flat MA. Sell/Hold.
+        4.  **Stage 4 (Declining)**: Price breaks below falling MA. **Avoid/Short.**
+        """)
+    
+    # Check Session State First
+    ad = st.session_state.get('analysis_data', {})
+    w_data = None
+    
+    if ad.get('ticker') == ticker and ad.get('weinstein'):
+        w_data = ad['weinstein']
+        
+    if not w_data:
+        if st.button("Analyze Stage", key="run_weinstein"):
+            with st.spinner("Analyzing Weekly Price Action..."):
+                w_data = get_weinstein_stage(ticker)
+            
+    if w_data:
+        # Top Result
+        st.metric("Current Stage", w_data['stage'], delta=f"Slope: {w_data['slope']:.2%}")
+        
+        # Chart
+        st.line_chart(w_data['data'][['Close', 'SMA30']])
+        
+        # Details
+        st.subheader("Stage Criteria Check")
+        for detail in w_data['details']:
+            st.write(detail)
+            
+        st.info(f"Mansfield Relative Strength: {w_data['mansfield_rs']:.2f}")
+    elif not w_data and ticker:
+        st.info("Analysis pending...")
+
+# --- TAB 10: CANSLIM STRATEGY ---
+with tab10:
+    st.header(f"🚀 CANSLIM Growth Strategy: {ticker}")
+    st.caption("William O'Neil's 7-Factor Growth Model.")
+    
+    with st.expander("Methodology: CANSLIM Growth"):
+        st.markdown("""
+        **William O'Neil's Checklist:**
+        - **C**urrent Earnings: EPS Growth > 25%?
+        - **A**nnual Earnings: 3-5yr Growth > 25%?
+        - **N**ew Highs/Products: Trading near 52w High?
+        - **S**upply/Demand: Volume surges on accumulation?
+        - **L**eader: Relative Strength > 80?
+        - **I**nstitutional Sponsorship: Increasing ownership?
+        - **M**arket Direction: Is the general market in an uptrend?
+        """)
+    
+    # Check Session State First
+    ad = st.session_state.get('analysis_data', {})
+    c_data = None
+    
+    if ad.get('ticker') == ticker and ad.get('canslim'):
+        c_data = ad['canslim']
+        
+    if not c_data:
+        if st.button("Run CANSLIM Check", key="run_canslim"):
+            with st.spinner("Checking Fundamental & Technical Growth Factors..."):
+                c_data = get_canslim_metrics(ticker)
+            
+    if c_data:
+        score = c_data['score']
+        st.metric("CANSLIM Score", f"{score}/7", delta="Bullish" if score >= 5 else "Neutral/Bearish")
+        
+        if score >= 6:
+            st.success("High Growth Potential (Watchlist Candidate)")
+        elif score <= 2:
+            st.error("Weak Growth Characteristics")
+        
+        st.divider()
+        
+        # Checklist UI
+        col_c1, col_c2 = st.columns(2)
+        
+        checklist = c_data['checklist']
+        items = list(checklist.items())
+        mid = len(items) // 2
+        
+        for k, v in items[:mid]:
+            with col_c1:
+                st.checkbox(f"{k}: {v['value']}", value=v['pass'], key=k, disabled=True)
+                
+        for k, v in items[mid:]:
+            with col_c2:
+                st.checkbox(f"{k}: {v['value']}", value=v['pass'], key=k+"2", disabled=True)
