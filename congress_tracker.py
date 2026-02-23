@@ -7,6 +7,8 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import streamlit as st
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 # Congress.gov API key
 BASE_URL = "https://api.congress.gov/v3"
@@ -164,25 +166,25 @@ def check_watchlist_overlap(trades_df, watchlist):
 
 
 if __name__ == '__main__':
-    print("\nCongressional Trading Tracker Test")
-    print("=" * 60)
+    logger.info("\nCongressional Trading Tracker Test")
+    logger.info("=" * 60)
     
     # Test fetching trades
     trades = fetch_stock_disclosures()
-    print(f"\nRecent Trades: {len(trades)} found")
-    print(trades.head())
+    logger.info(f"\nRecent Trades: {len(trades)} found")
+    logger.info(trades.head())
     
     # Test top tickers
     top_tickers = get_top_traded_tickers(trades)
-    print("\nTop Traded Tickers:")
-    print(top_tickers)
+    logger.info("\nTop Traded Tickers:")
+    logger.info(top_tickers)
     
     # Test active traders
     active = get_active_traders(trades)
-    print("\nMost Active Traders:")
-    print(active)
+    logger.info("\nMost Active Traders:")
+    logger.info(active)
     
     # Test watchlist
     overlap = check_watchlist_overlap(trades, ['NVDA', 'AAPL', 'TSLA'])
-    print("\nWatchlist Overlap (NVDA, AAPL, TSLA):")
-    print(overlap)
+    logger.info("\nWatchlist Overlap (NVDA, AAPL, TSLA):")
+    logger.info(overlap)

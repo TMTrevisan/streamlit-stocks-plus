@@ -8,6 +8,8 @@ import numpy as np
 import yfinance as yf
 from datetime import datetime, timedelta
 import streamlit as st
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes
@@ -238,7 +240,8 @@ def get_volatility_analysis(ticker, price_data):
             div_rate = info.get('dividendRate', 0)
             ex_div = info.get('exDividendDate')
             ex_div_date = datetime.fromtimestamp(ex_div).strftime('%Y-%m-%d') if ex_div else "N/A"
-        except:
+        except Exception as e:
+            logger.info(f"Error fetching fundamental IV info: {e}")
             iv_current = None
             earnings_date = "N/A"
             ex_div_date = "N/A"
@@ -254,36 +257,36 @@ def get_volatility_analysis(ticker, price_data):
             'div_rate': div_rate
         }
     except Exception as e:
-        print(f"Vol Error: {e}")
+        logger.info(f"Vol Error: {e}")
         return {}
 
 
 if __name__ == '__main__':
     # Test the module
-    print("\nOptions Flow Analysis Test")
-    print("=" * 60)
+    logger.info("\nOptions Flow Analysis Test")
+    logger.info("=" * 60)
     
     result = get_daily_flow_snapshot('SPY')
     
     if 'error' in result:
-        print(f"Error: {result['error']}")
+        logger.info(f"Error: {result['error']}")
     else:
-        print(f"\n{result['symbol']} @ ${result['current_price']:.2f}")
-        print(f"Timestamp: {result['timestamp']}")
-        print("\nFlow Metrics:")
-        print(f"  Total Call Premium: ${result['total_call_premium']:,.0f}")
-        print(f"  Total Put Premium: ${result['total_put_premium']:,.0f}")
-        print(f"  Net Premium: ${result['net_premium']:,.0f}")
-        print(f"\nRatios:")
-        print(f"  Put/Call Volume: {result['pc_volume_ratio']:.2f}")
-        print(f"  Put/Call Premium: {result['pc_premium_ratio']:.2f}")
-        print(f"\nUnusual Activity:")
-        print(f"  Unusual Calls: {result['unusual_calls_count']}")
-        print(f"  Unusual Puts: {result['unusual_puts_count']}")
+        logger.info(f"\n{result['symbol']} @ ${result['current_price']:.2f}")
+        logger.info(f"Timestamp: {result['timestamp']}")
+        logger.info("\nFlow Metrics:")
+        logger.info(f"  Total Call Premium: ${result['total_call_premium']:,.0f}")
+        logger.info(f"  Total Put Premium: ${result['total_put_premium']:,.0f}")
+        logger.info(f"  Net Premium: ${result['net_premium']:,.0f}")
+        logger.info(f"\nRatios:")
+        logger.info(f"  Put/Call Volume: {result['pc_volume_ratio']:.2f}")
+        logger.info(f"  Put/Call Premium: {result['pc_premium_ratio']:.2f}")
+        logger.info(f"\nUnusual Activity:")
+        logger.info(f"  Unusual Calls: {result['unusual_calls_count']}")
+        logger.info(f"  Unusual Puts: {result['unusual_puts_count']}")
         
         # Get sentiment
         sentiment = analyze_flow_sentiment(result)
-        print(f"\nSentiment: {sentiment['sentiment']}")
-        print(f"  {sentiment['description']}")
-        print(f"  Volume Bias: {sentiment['volume_bias']}")
-        print(f"  Premium Bias: {sentiment['premium_bias']}")
+        logger.info(f"\nSentiment: {sentiment['sentiment']}")
+        logger.info(f"  {sentiment['description']}")
+        logger.info(f"  Volume Bias: {sentiment['volume_bias']}")
+        logger.info(f"  Premium Bias: {sentiment['premium_bias']}")

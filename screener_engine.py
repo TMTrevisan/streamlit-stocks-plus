@@ -5,6 +5,8 @@ import yfinance as yf
 from yahooquery import Ticker
 import streamlit as st
 from datetime import datetime
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 # Cached function to get universe
 @st.cache_data(ttl=3600*24) # Cache for 24 hours
@@ -22,7 +24,7 @@ def get_screener_universe():
         return ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK-B", "UNH", "JNJ"]
 
 @st.cache_data(ttl=3600*4) # Cache for 4 hours
-def fetch_screener_data(tickers):
+def fetch_screener_data(tickers, limit=None):
     """
     Batch fetch fundamental and price data for screener.
     Refactored to use chunking and synchronous calls to prevent "Too many open files" error.
@@ -30,7 +32,11 @@ def fetch_screener_data(tickers):
     if not tickers:
         return pd.DataFrame()
 
-    CHUNK_SIZE = 50
+    # Apply limit if specified (e.g. for Quick Scan)
+    if limit:
+        tickers = tickers[:limit]
+
+    CHUNK_SIZE = 20 # Reduced from 50 to 20 for more frequent updates and stability
     all_data = []
     
     # Progress bar for long operations
@@ -38,14 +44,19 @@ def fetch_screener_data(tickers):
     status_text = st.empty()
     
     total_chunks = (len(tickers) + CHUNK_SIZE - 1) // CHUNK_SIZE
+    
+    import time
 
     for i in range(0, len(tickers), CHUNK_SIZE):
         chunk = tickers[i:i + CHUNK_SIZE]
         current_chunk_idx = i // CHUNK_SIZE + 1
-        status_text.text(f"Scanning batch {current_chunk_idx}/{total_chunks}...")
+        status_text.text(f"Scanning batch {current_chunk_idx}/{total_chunks} ({len(chunk)} tickers)...")
         progress_bar.progress(current_chunk_idx / total_chunks)
         
         try:
+            # Sleep briefly to be nice to APIs and avoid rate limits
+            time.sleep(0.2)
+            
             # 1. Fetch Fundamentals (Synchronous to save file descriptors)
             # Remove asynchronous=True to avoid OSError: Too many open files
             yq = Ticker(chunk, asynchronous=False) 
@@ -81,6 +92,11 @@ def fetch_screener_data(tickers):
             chunk_data['Volume'] = safe_extract_numeric(df_summary, 'volume')
             chunk_data['AvgVol'] = safe_extract_numeric(df_summary, 'averageVolume')
             chunk_data['Sector'] = safe_extract(df_summary, 'section')
+            # New Metrics for Day Trade / Tao Bull
+            chunk_data['Float'] = safe_extract_numeric(df_stats, 'floatShares')
+            chunk_data['Change%'] = safe_extract_numeric(df_price, 'regularMarketChangePercent') * 100 # Convert to %
+            chunk_data['PreMkt%'] = safe_extract_numeric(df_price, 'preMarketChangePercent') * 100
+
             
             # 2. Fetch History for Technicals (Trend, RSI, Volatility)
             # Using yfinance for history as it handles multi-ticker adjusted close well
@@ -95,7 +111,9 @@ def fetch_screener_data(tickers):
                 'SMA200': {},
                 'HV_20': {}, # Historical Volatility
                 'Trend_50': {}, # Price vs SMA50
-                'Trend_200': {} # Price vs SMA200
+                'Trend_200': {}, # Price vs SMA200
+                'EMA8': {}, 'EMA21': {}, 'EMA34': {}, 'EMA55': {}, 'EMA89': {},
+                'ADX': {}, 'StochK': {}
             }
             
             for ticker in chunk:
@@ -146,6 +164,41 @@ def fetch_screener_data(tickers):
                     else:
                          tech_data['Trend_200'][ticker] = "Down"
                     
+                    # --- New Tao Bull Technicals ---
+                    # EMAs: 8, 21, 34, 55, 89
+                    tech_data['EMA8'][ticker] = close.ewm(span=8, adjust=False).mean().iloc[-1]
+                    tech_data['EMA21'][ticker] = close.ewm(span=21, adjust=False).mean().iloc[-1]
+                    tech_data['EMA34'][ticker] = close.ewm(span=34, adjust=False).mean().iloc[-1]
+                    tech_data['EMA55'][ticker] = close.ewm(span=55, adjust=False).mean().iloc[-1]
+                    tech_data['EMA89'][ticker] = close.ewm(span=89, adjust=False).mean().iloc[-1]
+
+                    # ADX (14)
+                    high = df_t['High']
+                    low = df_t['Low']
+                    
+                    plus_dm = high.diff()
+                    minus_dm = low.diff()
+                    plus_dm[plus_dm < 0] = 0
+                    minus_dm[minus_dm > 0] = 0
+                    
+                    tr1 = high - low
+                    tr2 = abs(high - close.shift(1))
+                    tr3 = abs(low - close.shift(1))
+                    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+                    atr_14 = tr.rolling(14).mean()
+                    
+                    plus_di = 100 * (plus_dm.ewm(alpha=1/14).mean() / atr_14)
+                    minus_di = 100 * (abs(minus_dm).ewm(alpha=1/14).mean() / atr_14)
+                    dx = (abs(plus_di - minus_di) / abs(plus_di + minus_di)) * 100
+                    tech_data['ADX'][ticker] = dx.rolling(14).mean().iloc[-1]
+
+                    # Stochastic %K (8, 3, 3)
+                    stoch_low = low.rolling(window=8).min()
+                    stoch_high = high.rolling(window=8).max()
+                    k_raw = 100 * ((close - stoch_low) / (stoch_high - stoch_low))
+                    # Smooth K by 3 (Slow Stoch K)
+                    tech_data['StochK'][ticker] = k_raw.rolling(window=3).mean().iloc[-1]
+
                 except Exception:
                     continue
                     
@@ -153,12 +206,21 @@ def fetch_screener_data(tickers):
             chunk_data['RSI'] = pd.Series(tech_data['RSI'])
             chunk_data['SMA50'] = pd.Series(tech_data['SMA50'])
             chunk_data['SMA200'] = pd.Series(tech_data['SMA200'])
+
             chunk_data['HV_20'] = pd.Series(tech_data['HV_20'])
+            chunk_data['EMA8'] = pd.Series(tech_data['EMA8'])
+            chunk_data['EMA21'] = pd.Series(tech_data['EMA21'])
+            chunk_data['EMA34'] = pd.Series(tech_data['EMA34'])
+            chunk_data['EMA55'] = pd.Series(tech_data['EMA55'])
+            chunk_data['EMA89'] = pd.Series(tech_data['EMA89'])
+            chunk_data['ADX'] = pd.Series(tech_data['ADX'])
+            chunk_data['StochK'] = pd.Series(tech_data['StochK'])
+
             
             all_data.append(chunk_data)
             
         except Exception as e:
-            print(f"Error processing chunk {current_chunk_idx}: {e}")
+            logger.info(f"Error processing chunk {current_chunk_idx}: {e}")
             continue
             
     # Cleanup UI
@@ -225,4 +287,45 @@ def apply_strategy(df, strategy):
         )
         filtered = filtered[mask].sort_values('DivYield', ascending=False)
         
-    return filtered.head(20) # Return top 20
+    elif strategy == "Ultimate Stacked Bulls": 
+        # "Tao Bull" Swing Strategy
+        # 1. EMA 8 > 21 > 34 > 55 > 89
+        # 2. ADX > 20
+        # 3. AvgVol > 1M
+        # 4. Sort by Stochastic %K Ascending
+        
+        # Check alignment
+        aligned = (
+            (filtered['EMA8'] > filtered['EMA21']) &
+            (filtered['EMA21'] > filtered['EMA34']) &
+            (filtered['EMA34'] > filtered['EMA55']) &
+            (filtered['EMA55'] > filtered['EMA89'])
+        )
+        
+        mask = (
+            aligned &
+            (filtered['ADX'] > 20) &
+            (filtered['AvgVol'] > 1_000_000)
+        )
+        filtered = filtered[mask].sort_values('StochK', ascending=True) # Find the ones pulling back
+        
+    elif strategy == "Day Trade Runners":
+        # "Premarket Screener" / Intraday Runner
+        # 1. Float < 50M
+        # 2. Price < $20
+        # 3. Change% > 20% OR PreMkt% > 20%
+        # 4. RVOL > 4.0
+        
+        # Calculate RVOL if not present? We fetched Volume and AvgVol
+        # RVOL = Volume / AvgVol
+        filtered['RVOL'] = filtered['Volume'] / filtered['AvgVol']
+        
+        mask = (
+            (filtered['Float'] < 50_000_000) &
+            (filtered['Price'] < 20.0) &
+            (filtered['RVOL'] > 4.0) &
+            ((filtered['Change%'] > 20.0) | (filtered['PreMkt%'] > 20.0))
+        )
+        filtered = filtered[mask].sort_values('Change%', ascending=False)
+
+    return filtered.head(40) # Return top 40 results

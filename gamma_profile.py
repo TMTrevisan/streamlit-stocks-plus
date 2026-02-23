@@ -8,6 +8,8 @@ import numpy as np
 import yfinance as yf
 from datetime import datetime
 import streamlit as st
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes (options data changes frequently)
@@ -103,7 +105,7 @@ def fetch_options_chain(symbol, max_expirations=10):
         return df
         
     except Exception as e:
-        print(f"Error fetching options data: {e}")
+        logger.info(f"Error fetching options data: {e}")
         return None
 
 
@@ -268,10 +270,10 @@ if __name__ == '__main__':
     result = get_gamma_profile('SPY')
     
     if 'error' in result:
-        print(f"Error: {result['error']}")
+        logger.info(f"Error: {result['error']}")
     else:
-        print(f"\nGamma Profile for SPY - {result['timestamp']}")
-        print(f"Spot Price: ${result['spot']:.2f}")
-        print(f"\nKey Statistics:")
+        logger.info(f"\nGamma Profile for SPY - {result['timestamp']}")
+        logger.info(f"Spot Price: ${result['spot']:.2f}")
+        logger.info(f"\nKey Statistics:")
         for key, value in result['stats'].items():
-            print(f"  {key}: {value}")
+            logger.info(f"  {key}: {value}")

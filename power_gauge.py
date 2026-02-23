@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import streamlit as st
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 # --- SCORE NORMALIZATION HELPERS ---
 def normalize(value, min_val, max_val, invert=False):
@@ -48,7 +50,7 @@ def get_financial_score(info):
     # Approximation: Free Cashflow / Market Cap
     fcf = info.get('freeCashflow', None)
     mcap = info.get('marketCap', 1)
-    fcf_yield = (fcf / mcap) if fcf and mcap else 0
+    fcf_yield = (fcf / mcap) if fcf is not None and mcap is not None and mcap != 0 else None
     # Range: 0 (None) to 0.05 (5% Yield)
     scores['FCF Yield'] = normalize(fcf_yield, 0, 0.05)
     
@@ -122,7 +124,8 @@ def get_expert_score(info, ticker_obj):
             scores['Insider Activity'] = 50 
         else:
             scores['Insider Activity'] = 50
-    except:
+    except Exception as e:
+        logger.info(f"Error fetching insider transactions: {e}")
         scores['Insider Activity'] = 50
 
     # 4. Analyst Rating
@@ -236,5 +239,5 @@ def calculate_power_gauge(ticker):
         }
         
     except Exception as e:
-        print(f"Power Gauge Error: {e}")
+        logger.info(f"Power Gauge Error: {e}")
         return None

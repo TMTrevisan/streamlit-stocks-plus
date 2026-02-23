@@ -9,6 +9,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import streamlit as st
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 
 @st.cache_data(ttl=3600) # Cache data for 1 hour
@@ -342,7 +344,8 @@ def get_asbury_6_historical(days=90):
                     'Signal': signal,
                     'SPY_Close': spy_subset['Close'].iloc[-1]
                 })
-            except:
+            except Exception as e:
+                logger.info(f"Error calculating historical A6 on {date.date()}: {e}")
                 continue
         
         return pd.DataFrame(history)
@@ -355,10 +358,10 @@ if __name__ == '__main__':
 
     # Test the module
     result = get_asbury_6_signals()
-    print(f"\nAsbury 6 Market Health Check - {result['timestamp']}")
-    print(f"Overall Signal: {result['signal']} ({result['positive_count']} Positive, {result['negative_count']} Negative)\n")
+    logger.info(f"\nAsbury 6 Market Health Check - {result['timestamp']}")
+    logger.info(f"Overall Signal: {result['signal']} ({result['positive_count']} Positive, {result['negative_count']} Negative)\n")
     
     for metric in result['metrics']:
         status_icon = '✅' if metric['status'] == 'Positive' else '❌'
-        print(f"{status_icon} {metric['name']}: {metric['value']}")
-        print(f"   {metric['description']}\n")
+        logger.info(f"{status_icon} {metric['name']}: {metric['value']}")
+        logger.info(f"   {metric['description']}\n")

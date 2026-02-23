@@ -12,6 +12,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import streamlit as st
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
@@ -190,7 +192,7 @@ def get_seaf_model():
         return df
     
     except Exception as e:
-        print(f"Error in SEAF calculation: {e}")
+        logger.info(f"Error in SEAF calculation: {e}")
         return pd.DataFrame()
 
 
@@ -209,26 +211,26 @@ def get_top_3_sectors(seaf_df):
 
 if __name__ == '__main__':
     # Test the module
-    print("\nSEAF Model - Sector ETF Asset Flows")
-    print("=" * 60)
+    logger.info("\nSEAF Model - Sector ETF Asset Flows")
+    logger.info("=" * 60)
     
     seaf_results = get_seaf_model()
     
     if not seaf_results.empty:
-        print("\n📊 SEAF Rankings (Top to Bottom by Total Score):\n")
+        logger.info("\n📊 SEAF Rankings (Top to Bottom by Total Score):\n")
         
         # Display table
         display_cols = ['Rank', 'Ticker', 'Sector', 'Trading', 'Tactical', 
                        'Strategic', 'Long-term', 'Total_Score', 'Category']
-        print(seaf_results[display_cols].to_string(index=False))
+        logger.info(seaf_results[display_cols].to_string(index=False))
         
-        print("\n" + "=" * 60)
-        print("\n🎯 TOP 3 SECTORS FOR ALLOCATION:\n")
+        logger.info("\n" + "=" * 60)
+        logger.info("\n🎯 TOP 3 SECTORS FOR ALLOCATION:\n")
         
         top_3 = get_top_3_sectors(seaf_results)
         for idx, row in top_3.iterrows():
-            print(f"{row['Rank']}. {row['Ticker']} - {row['Sector']}")
-            print(f"   Total Score: {row['Total_Score']} ({row['Category']})")
-            print()
+            logger.info(f"{row['Rank']}. {row['Ticker']} - {row['Sector']}")
+            logger.info(f"   Total Score: {row['Total_Score']} ({row['Category']})")
+            logger.info()
     else:
-        print("Error: Could not calculate SEAF rankings")
+        logger.info("Error: Could not calculate SEAF rankings")

@@ -6,6 +6,8 @@ Fetches key fundamental quality and valuation metrics.
 import yfinance as yf
 import pandas as pd
 import streamlit as st
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def fetch_fundamental_data(ticker):
@@ -54,7 +56,7 @@ def fetch_fundamental_data(ticker):
         return metrics
         
     except Exception as e:
-        print(f"Error fetching fundamental data: {e}")
+        logger.info(f"Error fetching fundamental data: {e}")
         return None
 
 
@@ -71,8 +73,8 @@ def format_large_number(num):
 
 if __name__ == '__main__':
     # Test
-    print("Fetching TSM data...")
+    logger.info("Fetching TSM data...")
     data = fetch_fundamental_data("TSM")
     if data:
         for k, v in data.items():
-            print(f"{k}: {v}")
+            logger.info(f"{k}: {v}")

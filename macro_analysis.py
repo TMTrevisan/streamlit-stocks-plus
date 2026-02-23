@@ -10,6 +10,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import streamlit as st
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 # Macro Tickers
 MACRO_TICKERS = {
@@ -38,7 +40,7 @@ def fetch_macro_data(period="1y"):
             
         return data
     except Exception as e:
-        print(f"Error fetching macro data: {e}")
+        logger.info(f"Error fetching macro data: {e}")
         return pd.DataFrame()
 
 
@@ -55,7 +57,7 @@ def get_yield_curve_data(data):
         ten_year = closes[MACRO_TICKERS['10Y Yield']]
         three_month = closes[MACRO_TICKERS['3M Yield']]
         
-        spread = ten_year - three_month
+        spread = (ten_year - three_month) * 100 # Convert to bps
         
         df = pd.DataFrame({
             '10Y': ten_year,
@@ -65,7 +67,7 @@ def get_yield_curve_data(data):
         
         return df
     except KeyError as e:
-        print(f"Missing yield data: {e}")
+        logger.info(f"Missing yield data: {e}")
         return None
 
 
@@ -96,7 +98,7 @@ def get_asset_performance(data):
                 
         return perf_df
     except Exception as e:
-        print(f"Error calculating performance: {e}")
+        logger.info(f"Error calculating performance: {e}")
         return None
 
 
@@ -179,16 +181,16 @@ def render_intermarket_chart(perf_df):
 
 if __name__ == '__main__':
     # Test module
-    print("Testing Macro Analysis...")
+    logger.info("Testing Macro Analysis...")
     data = fetch_macro_data()
-    print("Data Fetched:", data.shape)
+    logger.info("Data Fetched:", data.shape)
     
     yields = get_yield_curve_data(data)
     if yields is not None:
-        print("\nYield Curve Data:")
-        print(yields.tail())
+        logger.info("\nYield Curve Data:")
+        logger.info(yields.tail())
         
     perf = get_asset_performance(data)
     if perf is not None:
-        print("\nPerformance Data:")
-        print(perf.tail())
+        logger.info("\nPerformance Data:")
+        logger.info(perf.tail())

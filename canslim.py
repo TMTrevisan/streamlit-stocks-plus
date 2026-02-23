@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import datetime
 import streamlit as st
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 @st.cache_data(ttl=3600*24)
 def get_canslim_metrics(ticker):
@@ -57,7 +59,8 @@ def get_canslim_metrics(ticker):
                 # Optimization: Assume 10% annual market return or use a fixed threshold > 20%
                 if ret_1y > 0.2: 
                     l_score = True
-        except:
+        except Exception as e:
+            logger.info(f"Error checking CANSLIM 1y historical return: {e}")
             pass
 
         # --- I: Institutional Sponsorship ---
@@ -92,5 +95,5 @@ def get_canslim_metrics(ticker):
         }
 
     except Exception as e:
-        print(f"CANSLIM Error: {e}")
+        logger.info(f"CANSLIM Error: {e}")
         return None

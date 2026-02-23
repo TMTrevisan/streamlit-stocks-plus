@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import datetime
+from services.logger import setup_logger
+logger = setup_logger(__name__)
 
 @st.cache_data(ttl=3600*24) # Cache for 24 hours
 def get_weinstein_stage(ticker):
@@ -19,7 +21,7 @@ def get_weinstein_stage(ticker):
         
         # Batch fetch if possible? Ticker object handles it.
         # We need weekly data.
-        data = yf.download([ticker, "SPY"], start=start_date, end=end_date, interval="1wk", group_by='ticker', progress=False, threads=True)
+        data = yf.download([ticker, "SPY"], start=start_date, end=end_date, interval="1wk", group_by='ticker', progress=False, threads=False)
         
         if data.empty:
             return None
@@ -110,5 +112,5 @@ def get_weinstein_stage(ticker):
         }
         
     except Exception as e:
-        print(f"Weinstein Analysis Error: {e}")
+        logger.info(f"Weinstein Analysis Error: {e}")
         return None
