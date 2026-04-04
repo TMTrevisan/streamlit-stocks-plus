@@ -23,6 +23,13 @@ import streamlit.components.v1 as components
 
 logger = setup_logger(__name__)
 
+# --- PERSISTENT TAB STATE ---
+# Preserve the active tab across reruns so widget interactions don't jump
+# back to tab 0. st.tabs in Streamlit 1.28+ supports `key` which pairs with
+# session_state to restore the selection on the next rerun.
+if 'active_tab' not in st.session_state:
+    st.session_state.active_tab = 0
+
 def get_tv_symbol(ticker):
     """Simple mapping for TradingView symbols."""
     ticker = ticker.upper()
@@ -317,7 +324,8 @@ except Exception as e:
 st.divider()
 
 # --- MAIN TABS ---
-tab1, tab2, tab5, tab3, tab4, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades", "🌪️ Options Flow", "🔍 Stock Screener", "⚡ Power Gauge", "📉 Stage Analysis", "🚀 CANSLIM", "💼 Navellier Grade"])
+TAB_LABELS = ["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades", "🌪️ Options Flow", "🔍 Stock Screener", "⚡ Power Gauge", "📉 Stage Analysis", "🚀 CANSLIM", "💼 Navellier Grade"]
+tab1, tab2, tab5, tab3, tab4, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs(TAB_LABELS)
 
 # --- TAB 1: MARKET HEALTH DASHBOARD ---
 with tab1:

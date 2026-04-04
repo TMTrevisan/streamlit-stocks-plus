@@ -7,20 +7,35 @@ def render_screener():
     
     col_s1, col_s2, col_s3 = st.columns([1, 1, 2])
     
+    STRATEGIES = [
+        "Cash Secured Puts (CSP)",
+        "Covered Calls (CC)",
+        "Short Momentum",
+        "Mid Momentum",
+        "Safe Long",
+        "Ultimate Stacked Bulls",
+        "Day Trade Runners",
+        "Navellier A-Rated Growth"
+    ]
+    
+    # Use session_state keys so strategy/scan selections survive reruns
+    # without jumping back to tab 0
+    if 'screener_strategy' not in st.session_state:
+        st.session_state.screener_strategy = STRATEGIES[0]
+    if 'screener_quick_scan' not in st.session_state:
+        st.session_state.screener_quick_scan = True
+    
     with col_s1:
-        strategy = st.selectbox("Select Strategy Preset", [
-            "Cash Secured Puts (CSP)",
-            "Covered Calls (CC)",
-            "Short Momentum",
-            "Mid Momentum",
-            "Safe Long",
-            "Ultimate Stacked Bulls",
-            "Day Trade Runners",
-            "Navellier A-Rated Growth"
-        ])
-        
-        # Add Quick Scan Option
-        quick_scan = st.checkbox("⚡ Quick Scan (Top 40 only)", value=True, help="Scan only the first 40 tickers for speed. Uncheck to scan full S&P 500.")
+        strategy = st.selectbox(
+            "Select Strategy Preset",
+            STRATEGIES,
+            key='screener_strategy'
+        )
+        quick_scan = st.checkbox(
+            "⚡ Quick Scan (Top 40 only)",
+            key='screener_quick_scan',
+            help="Scan only the first 40 tickers for speed. Uncheck to scan full S&P 500."
+        )
     
     if st.button("Run Screener", key="run_screener"):
         with st.spinner(f"Scanning {'Top 40' if quick_scan else 'S&P 500'} for {strategy} candidates..."):
