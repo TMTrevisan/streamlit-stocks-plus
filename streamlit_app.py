@@ -321,8 +321,7 @@ try:
 except Exception as e:
     st.warning("⚠️ Top signals temporarily unavailable.")
 
-# --- SIDEBAR NAVIGATION (Persists across reruns unlike st.tabs) ---
-st.sidebar.divider()
+# --- MAIN NAVIGATION (Persists across reruns inside the main body) ---
 TAB_LABELS = [
     "📊 Market Health",
     "📈 Sector Rotation",
@@ -340,9 +339,10 @@ TAB_LABELS = [
 if 'active_view' not in st.session_state:
     st.session_state.active_view = TAB_LABELS[0]
 
-active_view = st.sidebar.radio(
-    "Navigate",
+active_view = st.pills(
+    "Navigation",
     TAB_LABELS,
+    label_visibility="collapsed",
     key='active_view',
 )
 
