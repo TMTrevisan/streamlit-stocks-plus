@@ -317,7 +317,7 @@ except Exception as e:
 st.divider()
 
 # --- MAIN TABS ---
-tab1, tab2, tab5, tab3, tab4, tab6, tab7, tab8, tab9, tab10 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades", "🌪️ Options Flow", "🔍 Stock Screener", "⚡ Power Gauge", "📉 Stage Analysis", "🚀 CANSLIM"])
+tab1, tab2, tab5, tab3, tab4, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs(["📊 Market Health", "📈 Sector Rotation", "🌐 Intermarket", "📉 Stock Analysis", "🏛️ Congress Trades", "🌪️ Options Flow", "🔍 Stock Screener", "⚡ Power Gauge", "📉 Stage Analysis", "🚀 CANSLIM", "💼 Navellier Grade"])
 
 # --- TAB 1: MARKET HEALTH DASHBOARD ---
 with tab1:
@@ -407,4 +407,13 @@ with tab10:
         render_canslim(ticker)
     except Exception as e:
         logger.error(f"Error rendering CANSLIM Strategy tab: {e}")
+        st.error("⚠️ An error occurred while generating this tab. Please try again later.")
+
+# --- TAB 11: NAVELLIER GRADER ---
+with tab11:
+    try:
+        from views.navellier_tab import render_navellier
+        render_navellier(ticker)
+    except Exception as e:
+        logger.error(f"Error rendering Navellier Grader tab: {e}")
         st.error("⚠️ An error occurred while generating this tab. Please try again later.")
