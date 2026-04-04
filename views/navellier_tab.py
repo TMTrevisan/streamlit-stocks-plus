@@ -84,7 +84,7 @@ def render_navellier(ticker):
 
     st.divider()
     with st.expander("Methodology Explained"):
-        st.write(\"\"\"
+        st.write("""
         **Fundamental Grade** is determined by assessing:
         * Sales Growth, Operating Margin Growth, Earnings Growth, Earnings Surprises, Analyst Earnings Revisions, Cash Flow, Return on Equity.
         
@@ -96,4 +96,4 @@ def render_navellier(ticker):
         * C (Hold): Neutral rating.
         * D (Sell): Underwhelming fundamentals.
         * F (Strong Sell): Significant downside risks.
-        \"\"\")
+        """)
