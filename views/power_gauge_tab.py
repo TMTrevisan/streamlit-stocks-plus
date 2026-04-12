@@ -28,7 +28,15 @@ def render_power_gauge(ticker):
             with st.spinner(f"Analyzing {ticker} across 20 data points..."):
                 gauge = calculate_power_gauge(ticker)
     
-    if gauge:
+    if gauge and 'error' in gauge:
+        st.error(f"⚠️ Power Gauge data unavailable for {ticker}.")
+        with st.expander("Show Error Detail"):
+            st.code(gauge['traceback'], language="python")
+        if st.button("Retry Power Gauge", key="retry_power_gauge"):
+             st.session_state.analysis_data = {'ticker': None} # Force reset
+             st.rerun()
+             
+    elif gauge:
         # Top Level Result
         col_g1, col_g2 = st.columns([1, 2])
         

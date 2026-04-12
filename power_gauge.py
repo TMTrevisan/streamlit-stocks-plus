@@ -191,7 +191,7 @@ def get_technical_score(ticker, history):
     
     return scores
 
-@st.cache_data(ttl=3600*12) # Cache for 12 hours
+@st.cache_data(ttl=300) # Cache for 5 mins to avoid sticking on rate limits
 def calculate_power_gauge(ticker):
     """
     Master function to compute the 20-factor Power Gauge.
@@ -261,5 +261,8 @@ def calculate_power_gauge(ticker):
         }
         
     except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
         logger.info(f"Power Gauge Error: {e}")
-        return None
+        st.cache_data.clear() # Clear cache on failure so it can retry
+        return {"error": str(e), "traceback": tb}
