@@ -55,17 +55,92 @@ def render_power_gauge(ticker):
         c1, c2 = st.columns(2)
         c3, c4 = st.columns(2)
         
-        def render_category(col, title, data):
+        # Custom CSS for progress bars and layout
+        st.markdown("""
+        <style>
+        .pg-card {
+            background-color: #1e293b;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+        }
+        .pg-title {
+            color: #e2e8f0;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        .pg-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .pg-label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            width: 40%;
+        }
+        .pg-bar-container {
+            width: 55%;
+            background-color: #334155;
+            height: 10px;
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+        }
+        .pg-bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.5s ease-in-out;
+        }
+        
+        /* Gradients based on score */
+        .color-green { background: linear-gradient(90deg, #ef4444 0%, #eab308 50%, #22c55e 100%); }
+        .color-yellow { background: linear-gradient(90deg, #ef4444 0%, #eab308 100%); }
+        .color-red { background: linear-gradient(90deg, #ef4444 100%, #ef4444 100%); }
+        
+        .expert-highlight .pg-title { color: #38bdf8; }
+        .expert-highlight { border: 1px solid #0ea5e9; box-shadow: 0 0 10px rgba(14, 165, 233, 0.2); }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        def render_category(col, title, data, highlight=False):
+            highlight_class = "expert-highlight" if highlight else ""
+            
+            html = f"""
+            <div class="pg-card {highlight_class}">
+                <div class="pg-title">{title}</div>
+            """
+            
+            for factor, score in data.items():
+                # Determine color class
+                if score >= 65: color_class = "color-green"
+                elif score >= 35: color_class = "color-yellow"
+                else: color_class = "color-red"
+                
+                # Special highlight for CMF
+                label_display = factor
+                if factor == "Chaikin Money Flow":
+                    label_display = f'<span style="color: #22c55e; font-weight: bold;">{factor} (CMF)</span>'
+                
+                html += f"""
+                <div class="pg-row">
+                    <div class="pg-label">{label_display}</div>
+                    <div class="pg-bar-container">
+                        <div class="pg-bar-fill {color_class}" style="width: {score}%;"></div>
+                    </div>
+                </div>
+                """
+            html += "</div>"
             with col:
-                st.subheader(title)
-                for factor, score in data.items():
-                    st.write(f"**{factor}**")
-                    st.progress(int(score))
+                st.markdown(html, unsafe_allow_html=True)
         
         render_category(c1, "💰 Financials", gauge['details']['Financials'])
         render_category(c2, "📈 Earnings", gauge['details']['Earnings'])
         render_category(c3, "🛠️ Technicals", gauge['details']['Technicals'])
-        render_category(c4, "🧠 Experts", gauge['details']['Experts'])
+        render_category(c4, "🧠 Experts (The Secret Sauce)", gauge['details']['Experts'], highlight=True)
     elif not gauge and ticker:
         st.warning(f"⚠️ Power Gauge data unavailable for {ticker}. Check connection or API limits.")
         if st.button("Retry Power Gauge", key="retry_power_gauge"):
